@@ -15,6 +15,108 @@
   <meta property="og:description" content={{DESCRIPTION}}>
 
   <script>
+
+    console.log('hi from silverbullet index ......');
+    setTimeout(() => console.log('hi from silverbullet index 10 seconds later ......'), 10000);
+
+    let global_clicked = {
+      div: null,
+      selectionStart: null,
+      selectionEnd: null
+    }
+
+    function resetGlobalClicked() {
+      global_clicked.div = null;
+      global_clicked.selectionStart = null;
+      global_clicked.selectionEnd = null;
+    }
+
+    function typeInDiv(newText, el = global_clicked) {
+      if (el) {
+        if (el.div) {
+          const [start, end] = [el.selectionStart, el.selectionEnd];
+          console.log('el.div.textContent', el.div.textContent);
+          console.log('el.div.innerHtml', el.div.innerHtml);
+          el.div.textContent = el.div.textContent.slice(0, start) + newText + el.div.textContent.slice(end);
+          setTimeout(() => resetGlobalClicked(), 0);
+        }
+      }
+    }
+
+    // document.addEventListener('click', function (event) {
+    //   // Check if the clicked element is a DIV
+    //   if (event.target.tagName === 'DIV') {
+    //     const clickedDiv = event.target;
+
+    //     // Check if the DIV is contenteditable
+    //     if (clickedDiv.isContentEditable) {
+    //       setTimeout(() => {
+    //         const selection = window.getSelection();
+    //         if (selection.rangeCount > 0) {
+    //           console.log('Click on selection ', selection);
+    //           const range = selection.getRangeAt(0);
+    //           const clickedPosition = range.startOffset; // Caret position within the div
+    //           console.log('Clicked contenteditable div:', clickedDiv);
+    //           console.log('Clicked position within the div:', clickedPosition);
+    //           console.log('Clicked positions within the div:', global_clicked);
+    //         }
+    //       }, 0);
+    //     } else {
+    //       // For non-contenteditable divs, you might only be interested in the div element and click coordinates
+    //       console.log('Clicked non-contenteditable div:', clickedDiv);
+    //       console.log('Click coordinates: X=' + event.clientX + ', Y=' + event.clientY);
+    //     }
+    //   }
+    // });
+
+
+    document.addEventListener('selectionchange', () => {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        console.log('Click on selection ', selection);
+        const range = selection.getRangeAt(0);
+        const caretPosition = range.startOffset;
+        let containerElement = null;
+        if ('tagName' in range.startContainer && range.startContainer.tagName === 'DIV') {
+          containerElement = range.startContainer;
+        } else {
+          containerElement = range.startContainer.parentElement;
+        }
+        console.log('Caret moved to position', caretPosition, 'in element', containerElement);
+        if (containerElement.tagName === 'DIV' && containerElement.isContentEditable) {
+          global_clicked.div = containerElement;
+          global_clicked.selectionStart = Math.min(selection.baseOffset, selection.focusOffset);
+          global_clicked.selectionEnd = Math.max(selection.baseOffset, selection.focusOffset);
+          console.log('global_clicked ', global_clicked);
+        }
+      }
+    });
+
+
+    window.addEventListener('message', event => {
+      // IMPORTANT: check the origin of the data!
+      console.log('postmessage listening in silverbullet');
+      console.log(event.origin, event.data, event);
+      if (event.origin === 'http://localhost:7860') {
+        // The data was sent from your site.
+        console.log('processing message ', event.data);
+        if (event.data.startsWith('silverbullet ')) {
+          console.log('got this event.data: ' + event.data);
+          let command = event.data.slice('silverbullet '.length);
+          if (command.startsWith('type ')) {
+            let str = command.slice('type '.length);
+            typeInDiv(str, global_clicked);
+          }
+        }
+      } else {
+        // The data was NOT sent from your site!
+        return;
+      }
+    });
+
+  </script>
+
+  <script>
     // Some global variables we need to make this work
     Deno = {
       args: [],
