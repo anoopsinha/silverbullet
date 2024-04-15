@@ -395,6 +395,17 @@
     padding-right: 7px;
   }
 
+  .sb-code-copy-button {
+    float: right;
+    cursor: pointer;
+    margin: 0 3px;
+  }
+
+  .sb-code-copy-button>svg {
+    height: 1rem;
+    width: 1rem;
+  }
+
   .sb-line-fenced-code .sb-code {
     background-color: transparent;
   }
@@ -571,10 +582,16 @@
   }
 
   .sb-admonition-icon {
+    mask: var(--admonition-icon) no-repeat;
+    -webkit-mask: var(--admonition-icon) no-repeat;
+    mask-size: cover;
+    -webkit-mask-size: cover;
+    width: 1.1em;
+    height: 1.1em;
     display: inline-flex;
     vertical-align: middle;
-    padding-left: 16px;
-    padding-right: 8px;
+    margin-left: 16px;
+    margin-right: 8px;
   }
 
   .sb-frontmatter-marker {

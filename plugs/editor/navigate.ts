@@ -1,4 +1,4 @@
-import type { ClickEvent } from "$sb/app_event.ts";
+import type { ClickEvent } from "../../plug-api/types.ts";
 import { editor, markdown, system } from "$sb/syscalls.ts";
 import {
   addParentPointers,
@@ -8,7 +8,7 @@ import {
   ParseTree,
 } from "$sb/lib/tree.ts";
 import { resolveAttachmentPath, resolvePath } from "$sb/lib/resolve.ts";
-import { parsePageRef } from "$sb/lib/page.ts";
+import { parsePageRef } from "$sb/lib/page_ref.ts";
 import { tagPrefix } from "../index/constants.ts";
 
 async function actionClickOrActionEnter(
@@ -139,4 +139,12 @@ export async function navigateToPage(_cmdDef: any, pageName: string) {
 
 export async function navigateToURL(_cmdDef: any, url: string) {
   await editor.openUrl(url, false);
+}
+
+export async function navigateBack() {
+  await editor.goHistory(-1);
+}
+
+export async function navigateForward() {
+  await editor.goHistory(1);
 }

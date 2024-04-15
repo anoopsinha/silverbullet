@@ -37,6 +37,22 @@ Note that you can also query this page using the `example-tag` directly:
 example-tag
 ```
 
+## table
+Markdown table rows are indexed using the `table` tag, any additional tags can be added using [[Tags]] in any of its cells.
+
+| Title | Description Text |
+| --- | ----- |
+| This is some key | The value contains a #table-tag |
+| Some Row | This is an example row in between two others |
+| Another key | This time without a tag |
+
+
+```query
+table
+```
+
+Table headers will be normalized by converting them to lowercase and replacing all non alphanumeric characters with `_`.
+
 ## task
 
 task
@@ -131,7 +147,7 @@ link where page = @page.name
 ```
 
 ## anchor
-[[Anchors]] use the $myanchor notation to allow deeplinking into a page and are also indexed and queryable. It is not possible to attach additional tags to an anchor.
+[[Markdown/Anchors]] use the $myanchor notation to allow deeplinking into a page and are also indexed and queryable. It is not possible to attach additional tags to an anchor.
 
 Here is an example query:
 
@@ -162,3 +178,20 @@ This is another meta tag, which is used to index all [[Attributes]] used in your
 ```query
 attribute where page = @page.name limit 1 
 ```
+
+# System tags
+The following tags are technically implemented a bit differently than the rest, but they are still available to be queried.
+
+## command
+Enables querying of all [[Commands]] available in SilverBullet as well as their assigned keyboard shortcuts.
+```query
+command order by name limit 5
+```
+
+## syscall
+Enables querying of all [[PlugOS]] syscalls enabled in your space. Mostly useful in the context of [[Plugs]] and [[Space Script]] development.
+
+```query
+syscall limit 5
+```
+

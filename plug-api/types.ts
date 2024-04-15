@@ -1,3 +1,6 @@
+import type { ParseTree } from "./lib/tree.ts";
+import type { TextChange } from "../web/change.ts";
+
 export type FileMeta = {
   name: string;
   created: number;
@@ -25,6 +28,12 @@ export type AttachmentMeta = {
   lastModified: number;
   size: number;
   perm: "ro" | "rw";
+};
+
+export type SyscallMeta = {
+  name: string;
+  requiredPermissions: string[];
+  argCount: number;
 };
 
 // Message Queue related types
@@ -104,6 +113,7 @@ export type QueryExpression =
   | ["object", [string, QueryExpression][]]
   | ["regexp", string, string] // regex, modifier
   | ["pageref", string]
+  | ["-", QueryExpression]
   | ["+", QueryExpression, QueryExpression]
   | ["-", QueryExpression, QueryExpression]
   | ["*", QueryExpression, QueryExpression]
@@ -164,4 +174,90 @@ export type UploadFile = {
   name: string;
   contentType: string;
   content: Uint8Array;
+};
+
+export type AppEvent =
+  | "page:click"
+  | "editor:complete"
+  | "minieditor:complete"
+  | "slash:complete"
+  | "editor:lint"
+  | "page:load"
+  | "editor:init"
+  | "editor:pageLoaded" // args: pageName, previousPage, isSynced
+  | "editor:pageReloaded"
+  | "editor:pageSaving"
+  | "editor:pageSaved"
+  | "editor:modeswitch"
+  | "plugs:loaded"
+  | "editor:pageModified";
+
+export type QueryProviderEvent = {
+  query: Query;
+  variables?: Record<string, any>;
+};
+
+export type ClickEvent = {
+  page: string;
+  pos: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+};
+
+export type IndexEvent = {
+  name: string;
+  text: string;
+};
+
+export type IndexTreeEvent = {
+  name: string;
+  tree: ParseTree;
+};
+
+export type PublishEvent = {
+  uri?: string;
+  // Page name
+  name: string;
+};
+
+export type LintEvent = {
+  name: string;
+  tree: ParseTree;
+};
+
+export type CompleteEvent = {
+  pageName: string;
+  linePrefix: string;
+  pos: number;
+  parentNodes: string[];
+};
+
+export type SlashCompletionOption = {
+  label: string;
+  detail?: string;
+  invoke: string;
+  order?: number;
+} & Record<string, any>;
+
+export type SlashCompletions = {
+  // Ignore this one, only for compatibility with regular completions
+  from?: number;
+  // The actual completions
+  options: SlashCompletionOption[];
+};
+
+export type WidgetContent = {
+  html?: string;
+  script?: string;
+  markdown?: string;
+  url?: string;
+  height?: number;
+  width?: number;
+};
+
+/** PageModifiedEvent payload for "editor:pageModified". Fired when the document text changes
+ */
+export type PageModifiedEvent = {
+  changes: TextChange[];
 };

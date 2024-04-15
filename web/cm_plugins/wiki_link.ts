@@ -1,6 +1,7 @@
-import { pageLinkRegex } from "../../common/markdown_parser/parser.ts";
-import { ClickEvent } from "../../plug-api/app_event.ts";
-import { Decoration, syntaxTree } from "../deps.ts";
+import { pageLinkRegex } from "$common/markdown_parser/parser.ts";
+import { ClickEvent } from "../../plug-api/types.ts";
+import { syntaxTree } from "@codemirror/language";
+import { Decoration } from "@codemirror/view";
 import { Client } from "../client.ts";
 import {
   decoratorStateField,
@@ -9,7 +10,7 @@ import {
   LinkWidget,
 } from "./util.ts";
 import { resolvePath } from "$sb/lib/resolve.ts";
-import { encodePageRef, parsePageRef } from "$sb/lib/page.ts";
+import { encodePageRef, parsePageRef } from "../../plug-api/lib/page_ref.ts";
 
 /**
  * Plugin to hide path prefix when the cursor is not inside.
@@ -33,7 +34,7 @@ export function cleanWikiLinkPlugin(client: Client) {
         const pageRef = parsePageRef(page);
         pageRef.page = resolvePath(client.currentPage, pageRef.page);
         const lowerCasePageName = pageRef.page.toLowerCase();
-        for (const pageName of client.allKnownPages) {
+        for (const pageName of client.clientSystem.allKnownPages) {
           if (pageName.toLowerCase() === lowerCasePageName) {
             pageExists = true;
             break;

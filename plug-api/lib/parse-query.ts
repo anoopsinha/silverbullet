@@ -1,5 +1,5 @@
-import { type AST, parseTreeToAST } from "$sb/lib/tree.ts";
-import type { Query, QueryExpression } from "$sb/types.ts";
+import { type AST, parseTreeToAST } from "./tree.ts";
+import type { Query, QueryExpression } from "../types.ts";
 import { language } from "$sb/syscalls.ts";
 
 export function astToKvQuery(
@@ -63,10 +63,12 @@ export function astToKvQuery(
               query.select = [];
             }
             if (select.length === 2) {
-              query.select.push({ name: select[1][1] as string });
+              query.select.push({
+                name: cleanIdentifier(select[1][1] as string),
+              });
             } else {
               query.select.push({
-                name: select[3][1] as string,
+                name: cleanIdentifier(select[3][1] as string),
                 expr: expressionToKvQueryExpression(select[1]),
               });
             }
@@ -88,6 +90,13 @@ export function astToKvQuery(
   return query;
 }
 
+function cleanIdentifier(s: string): string {
+  if (s.startsWith("`") && s.endsWith("`")) {
+    return s.slice(1, -1);
+  }
+  return s;
+}
+
 export function expressionToKvQueryExpression(node: AST): QueryExpression {
   if (["LVal", "Expression", "Value"].includes(node[0])) {
     return expressionToKvQueryExpression(node[1]);
@@ -98,11 +107,11 @@ export function expressionToKvQueryExpression(node: AST): QueryExpression {
       return [
         "attr",
         expressionToKvQueryExpression(node[1]),
-        node[3][1] as string,
+        cleanIdentifier(node[3][1] as string),
       ];
     }
     case "Identifier":
-      return ["attr", node[1] as string];
+      return ["attr", cleanIdentifier(node[1] as string)];
     case "String":
       return ["string", (node[1] as string).slice(1, -1)];
     case "Number":
@@ -155,7 +164,7 @@ export function expressionToKvQueryExpression(node: AST): QueryExpression {
     }
     case "Call": {
       // console.log("Call", node);
-      const fn = node[1][1] as string;
+      const fn = cleanIdentifier(node[1][1] as string);
       const args: AST[] = [];
       for (const expr of node.slice(2)) {
         if (expr[0] === "Expression") {
@@ -168,6 +177,8 @@ export function expressionToKvQueryExpression(node: AST): QueryExpression {
       // console.log("UnaryExpression", node);
       if (node[1][0] === "NotKW" || node[1][0] === "!") {
         return ["not", expressionToKvQueryExpression(node[2])];
+      } else if (node[1][0] === "-") {
+        return ["-", expressionToKvQueryExpression(node[2])];
       }
       throw new Error(`Unknown unary expression: ${node[1][0]}`);
     }

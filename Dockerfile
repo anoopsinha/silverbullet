@@ -1,4 +1,4 @@
-FROM lukechannings/deno:v1.40.3
+FROM denoland/deno:debian-1.42.1
 # The volume that will keep the space data
 
 # Either create a volume:

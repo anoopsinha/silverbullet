@@ -6,10 +6,9 @@ import {
   removeParentPointers,
   renderToText,
   traverseTree,
-} from "$sb/lib/tree.ts";
-import { parsePageRef } from "$sb/lib/page.ts";
+} from "../../plug-api/lib/tree.ts";
+import { encodePageRef, parsePageRef } from "$sb/lib/page_ref.ts";
 import { Fragment, renderHtml, Tag } from "./html_render.ts";
-import { encodePageRef } from "$sb/lib/page.ts";
 
 export type MarkdownRenderOptions = {
   failOnUnknown?: true;
@@ -40,7 +39,10 @@ function preprocess(t: ParseTree, options: MarkdownRenderOptions = {}) {
     if (!node.type) {
       if (node.text?.startsWith("\n")) {
         const prevNodeIdx = node.parent!.children!.indexOf(node) - 1;
-        if (node.parent!.children![prevNodeIdx]?.type !== "Paragraph") {
+        const prevNodeType = node.parent!.children![prevNodeIdx]?.type;
+        if (
+          prevNodeType?.includes("Heading") || prevNodeType?.includes("Table")
+        ) {
           node.text = node.text.slice(1);
         }
       }
@@ -208,7 +210,12 @@ function render(
       }
       let url = urlNode.children![0].text!;
       if (url.indexOf("://") === -1) {
-        url = `${options.attachmentUrlPrefix || ""}${url}`;
+        if (
+          options.attachmentUrlPrefix &&
+          !url.startsWith(options.attachmentUrlPrefix)
+        ) {
+          url = `${options.attachmentUrlPrefix}${url}`;
+        }
       }
       return {
         name: "a",
@@ -226,7 +233,12 @@ function render(
       }
       let url = urlNode!.children![0].text!;
       if (url.indexOf("://") === -1) {
-        url = `${options.attachmentUrlPrefix || ""}${url}`;
+        if (
+          options.attachmentUrlPrefix &&
+          !url.startsWith(options.attachmentUrlPrefix)
+        ) {
+          url = `${options.attachmentUrlPrefix}${url}`;
+        }
       }
       return {
         name: "img",

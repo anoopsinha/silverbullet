@@ -2,12 +2,78 @@ An attempt at documenting the changes/new features introduced in each
 release.
 
 ---
+
 ## Edge
 _These features are not yet properly released, you need to use [the edge builds](https://community.silverbullet.md/t/living-on-the-edge-builds/27) to try them._
 
-* Numerous bug fixes and significant performance improvements in rendering templates (which now happen server-side), including code completion fixes.
+* Nothing new since 0.7.6 yet!
+
+---
+
+## 0.7.6
+* We now have [[Space Style]] in addition to [[Space Script]], enabling CSS tweaks to SilverBullet itself from any page (by [onespaceman](https://github.com/silverbulletmd/silverbullet/pull/796))
+* Added [[Functions#contains(str, substr)]] function
+* Properly report errors when calling non-existing [[Functions]] in queries
+* It’s now possible to call [[Space Script#Custom functions]] in `indexPage` in [[SETTINGS]]
+* Support custom [[Markdown/Admonitions]] (by [onespaceman](https://github.com/silverbulletmd/silverbullet/pull/786))
+* Improved snippets for [[Links]] indexing (visible in [[Linked Mentions]]) (a {[Space: Reindex]} is required to see this), attempts to include the entire surrounding sentence, and if that’s too long cuts it down, but not mid-word.
+* [[Objects#header]] containing [[Tags]] or [[Attributes]] are now properly indexed
+* (Hopefully) fixed [weird rendering bugs](https://github.com/silverbulletmd/silverbullet/issues/745) for markdown in templates
+* New {[Editor: Undo]} and {[Editor: Redo]} commands (so you can customize their keybindings or add them as actionButtons in [[SETTINGS]]).
+* Various bugfixes around frontmatter in [[Snippets]].
+* More attempts at fixing unnecessary “Page has changed elsewhere, reloading” reloads.
+* Various other bug fixes
+
+---
+
+## 0.7.5
+* [[Plugs/Share]] using the {[Share: Page Or Selection]} command (bound to Ctrl-s/Cmd-s by default): allowing you to quickly share the current page (or selection) to the clipboard as:
+  * Clean markdown (to paste into other markdown supporting tools)
+  * Rich text (to paste into unenlightened rich text tools like Google Docs, Confluence, Word etc.)
+* Various improvements in tests and input checks (by Maks [here](https://github.com/silverbulletmd/silverbullet/pull/754) and [here](https://github.com/silverbulletmd/silverbullet/pull/751))
+* Better sizing of the top bar (was buggy before and poorly implemented) (by [onespaceman](https://github.com/silverbulletmd/silverbullet/pull/753))
+* Hashtag can now contain more different characters, including emoji (by [Matthew Pietz](https://github.com/silverbulletmd/silverbullet/pull/752))
+* New [[Space Script]] APIs: `registerAttributeExtractor` and `registerEventListener`
+
+---
+
+## 0.7.3
+
+* We had a big influx of people and contributions from the community, which is amazing. Here are the highlights:
+  * Ability to “bake” templates and query results (with the new “bake” button or {[Page: Bake live blocks]}), that is: replace these blocks with their rendered results, and therefore freeze them in time, by [Marek S. Łukasiewicz](https://github.com/silverbulletmd/silverbullet/pull/719)
+  * Pre-fill a new page with heading title in {[Page: Extract]} by [Patrik Stenmark](https://github.com/silverbulletmd/silverbullet/pull/744)
+  * Added custom data field to template plug by [Michael Kolb](https://github.com/silverbulletmd/silverbullet/pull/716)
+  * Markdown tables are now indexed [[Objects#table]], and queryable by [Michael Kolb](https://github.com/silverbulletmd/silverbullet/pull/729)
+  * Added “copy to clipboard” button to code blocks, by [Joe Krill](https://github.com/silverbulletmd/silverbullet/pull/735)
+  * Fenced code can now also use `~~~` in addition to triple backticks, by [Marek S. Łukasiewicz](https://github.com/silverbulletmd/silverbullet/pull/694)
+  * Markdown preview pane now uses custom styles and dark mode, by [Joe Krill](https://github.com/silverbulletmd/silverbullet/pull/741)
+  * Correctly skip adding default shortcuts for overridden commands, by [Joe Krill](https://github.com/silverbulletmd/silverbullet/pull/739)
+  * Fix {[Link: Unfurl]} command, by [Joe Krill](https://github.com/silverbulletmd/silverbullet/pull/738)
+  * [[Expression Language]] now supports unary minus (e.g. `-3`), by [Marek S. Łukasiewicz](https://github.com/silverbulletmd/silverbullet/pull/732)
+  * Added [[Markdown/Syntax Highlighting]] for Diff, Powershell, Perl, TCL, Verilos, VHDL, Docker and CMake), by [Giovanni Pollo](https://github.com/silverbulletmd/silverbullet/pull/718) and Go by [Viktoras](https://github.com/silverbulletmd/silverbullet/pull/709)
+  * Fixed dark mode for templates, by [Ashish Dhama](https://github.com/silverbulletmd/silverbullet/pull/698)
+* There are also two very notable new plugs you may be interested in trying:
+  * [[Plugs/TreeView]]: a sidebar showing (and allowing you to manipulate) your space’s folder tree (at long last)
+  * [[Plugs/AI]]: various clever AI integrations (supporting many different LLMs, including locally hosted ones)
+* [[Snippets]] using `matchRegex` can now use the `|^|` caret to wrap text around the replacement, see the [[Snippets#Examples]]
+* Changed the signature of `silverbullet.registerFunction` to make the first argument an object, see [[Space Script#Custom functions]]. Old string-based scripts still work, for backwards compatibility.
+* The [[Functions#replace(str, match, replacement)]] function now supports multiple replacements
+* You can now use backticks (`) around identifiers in [[Expression Language]], to e.g. use names with spaces or other weird characters as attribute names.
+* [[Link Unfurl]] now supports unfurling youtube videos
+* Fixed edit button on code widgets after they have shifted
+* Fixed page completion in template blocks
+* Giant code reorganization (hopefully resulting in 0 regressions)
+
+---
+
+## 0.7.1
+* Numerous bug fixes and significant performance improvements in template rendering (which now happen server-side), including code completion fixes.
 * New `{{#each @varname in <expression>}}` syntax in [[Template Language#each directive]].
-* New [[Functions#readPage(name)]] function
+* **Experimental feature**: [[Space Script]], the ability to extend SilverBullet from within your SilverBullet space with JavaScript.
+* New [[Functions#readPage(name)]] function.
+* New query sources: [[Objects#command]] and [[Objects#syscall]]. The [[Keyboard Shortcuts]] and [[Commands]] pages now use these to list all key bindings and available commands automatically.
+* You can now create emoji aliases (implemented by [Maarrk](https://github.com/silverbulletmd/silverbullet/pull/679)), see [[SETTINGS]] for an example 😅
+* You can now conditionally show action buttons (see [[SETTINGS]]) _only_ on mobile devices (implemented by [Maarrk](https://github.com/silverbulletmd/silverbullet/pull/686))
 
 ---
 
@@ -162,7 +228,7 @@ So, what’s the fuss all about?
 * [[Live Queries]]:
   * Support for `render all` where the entire result set is passed to a single template allowing you to e.g. dynamically build up tables, see [[Live Queries$render]] for an example.
 * The default generated [[SETTINGS]] page now contains a link to [[SETTINGS]] on silverbullet.md for documentation purposes.
-* The syntax to reference [[Anchors]] has now changed to use `$`, instead of `@` (e.g. [[Live Queries$render]]), the old syntax still works but is deprecated. The reason for this change is consistency: you define an anchor using the `$myanchor` syntax, referencing it the same way makes more sense.
+* The syntax to reference [[Markdown/Anchors]] has now changed to use `$`, instead of `@` (e.g. [[Live Queries$render]]), the old syntax still works but is deprecated. The reason for this change is consistency: you define an anchor using the `$myanchor` syntax, referencing it the same way makes more sense.
 * [[Page Name Rules]] are now documented
 
 ---

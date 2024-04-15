@@ -63,7 +63,7 @@ Expression {
 | Attribute
 | TopLevelVal
 | ParenthesizedExpression
-| LogicalExpression 
+| LogicalExpression
 | QueryExpression
 | UnaryExpression
 | BinExpression
@@ -80,6 +80,7 @@ QueryExpression {
 UnaryExpression {
     !unaryop NotKW Expression
   | !unaryop "!" Expression
+  | !unaryop "-" Expression
 }
 
 BinExpression {
@@ -124,14 +125,13 @@ Bool {
 
   TagIdentifier { @asciiLetter (@asciiLetter | @digit | "-" | "_" | "/" )* }
 
-  Identifier { @asciiLetter (@asciiLetter | @digit | "-" | "_")* }
+  Identifier { @asciiLetter (@asciiLetter | @digit | "-" | "_")* |  "`" ![`]* "`" }
 
   GlobalIdentifier { "@" @asciiLetter (@asciiLetter | @digit | "-" | "_")* }
 
   String {
       "\"" ![\"]* "\""
     | "'" ![']* "'"
-    | "`" ![`]* "`"
   }
   PageRef {
     "[[" ![\]]* "]]"
@@ -150,6 +150,4 @@ Bool {
   OrderKW { "asc" | "desc" }
 
   @precedence { Order, BooleanKW, InKW, OrderKW, NotKW, Identifier, Number }
-
-  
 }

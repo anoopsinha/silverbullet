@@ -1,8 +1,8 @@
-import { parse } from "../../common/markdown_parser/parse_tree.ts";
-import { AST, collectNodesOfType, parseTreeToAST } from "$sb/lib/tree.ts";
-import { assert, assertEquals } from "../../test_deps.ts";
+import { parse } from "$common/markdown_parser/parse_tree.ts";
+import { AST, collectNodesOfType, parseTreeToAST } from "./tree.ts";
+import { assert, assertEquals } from "$std/testing/asserts.ts";
 import { astToKvQuery } from "$sb/lib/parse-query.ts";
-import { languageFor } from "../../common/languages.ts";
+import { languageFor } from "$common/languages.ts";
 
 function wrapQueryParse(query: string): AST | null {
   const tree = parse(languageFor("query")!, query);
@@ -40,6 +40,41 @@ Deno.test("Test query parser", () => {
     {
       querySource: "page",
       filter: ["attr"],
+    },
+  );
+
+  assertEquals(
+    astToKvQuery(wrapQueryParse(`page where name = "hello"`)!),
+    {
+      querySource: "page",
+      filter: ["=", ["attr", "name"], [
+        "string",
+        "hello",
+      ]],
+    },
+  );
+
+  assertEquals(
+    astToKvQuery(wrapQueryParse("page where `name`")!),
+    {
+      querySource: "page",
+      filter: ["attr", "name"],
+    },
+  );
+
+  assertEquals(
+    astToKvQuery(wrapQueryParse("page where `something`.`name`")!),
+    {
+      querySource: "page",
+      filter: ["attr", ["attr", "something"], "name"],
+    },
+  );
+
+  assertEquals(
+    astToKvQuery(wrapQueryParse("page select 10 as `something`, `name`")!),
+    {
+      querySource: "page",
+      select: [{ name: "something", expr: ["number", 10] }, { name: "name" }],
     },
   );
 
@@ -366,6 +401,39 @@ Deno.test("Test query parser", () => {
           "no",
         ]],
       }],
+    },
+  );
+
+  assertEquals(
+    astToKvQuery(
+      wrapQueryParse(`page where myCall(-3) > 4 - 2`)!,
+    ),
+    {
+      querySource: "page",
+      filter: [">", ["call", "myCall", [["-", ["number", 3]]]], ["-", [
+        "number",
+        4,
+      ], ["number", 2]]],
+    },
+  );
+
+  assertEquals(
+    astToKvQuery(
+      wrapQueryParse(`page where 1 * 2 - 3`)!,
+    ),
+    {
+      querySource: "page",
+      filter: ["-", ["*", ["number", 1], ["number", 2]], ["number", 3]],
+    },
+  );
+
+  assertEquals(
+    astToKvQuery(
+      wrapQueryParse(`page where 1*-2`)!,
+    ),
+    {
+      querySource: "page",
+      filter: ["*", ["number", 1], ["-", ["number", 2]]],
     },
   );
 });

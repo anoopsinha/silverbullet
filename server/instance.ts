@@ -1,15 +1,18 @@
-import { SilverBulletHooks } from "../common/manifest.ts";
-import { AssetBundlePlugSpacePrimitives } from "../common/spaces/asset_bundle_space_primitives.ts";
-import { FilteredSpacePrimitives } from "../common/spaces/filtered_space_primitives.ts";
-import { ReadOnlySpacePrimitives } from "../common/spaces/ro_space_primitives.ts";
-import { SpacePrimitives } from "../common/spaces/space_primitives.ts";
-import { ensureAndLoadSettingsAndIndex } from "../common/util.ts";
-import { AssetBundle } from "../plugos/asset_bundle/bundle.ts";
-import { KvPrimitives } from "../plugos/lib/kv_primitives.ts";
-import { System } from "../plugos/system.ts";
-import { BuiltinSettings } from "../web/types.ts";
+import { SilverBulletHooks } from "../lib/manifest.ts";
+import { ensureAndLoadSettingsAndIndex } from "$common/settings.ts";
+import { AssetBundlePlugSpacePrimitives } from "$common/spaces/asset_bundle_space_primitives.ts";
+import { FilteredSpacePrimitives } from "$common/spaces/filtered_space_primitives.ts";
+import { ReadOnlySpacePrimitives } from "$common/spaces/ro_space_primitives.ts";
+import { SpacePrimitives } from "$common/spaces/space_primitives.ts";
+import { AssetBundle } from "../lib/asset_bundle/bundle.ts";
+import { EventHook } from "../common/hooks/event.ts";
+import { DataStore } from "$lib/data/datastore.ts";
+import { KvPrimitives } from "$lib/data/kv_primitives.ts";
+import { DataStoreMQ } from "$lib/data/mq.datastore.ts";
+import { System } from "$lib/plugos/system.ts";
+import { BuiltinSettings } from "../type/web.ts";
 import { JWTIssuer } from "./crypto.ts";
-import { gitIgnoreCompiler } from "./deps.ts";
+import { compile as gitIgnoreCompiler } from "gitignore-parser";
 import { ServerSystem } from "./server_system.ts";
 import { determineShellBackend, NotSupportedShell } from "./shell_backend.ts";
 import { ShellBackend } from "./shell_backend.ts";
@@ -26,9 +29,11 @@ export type SpaceServerConfig = {
   shellBackend: string;
   syncOnly: boolean;
   readOnly: boolean;
+  enableSpaceScript: boolean;
   clientEncryption: boolean;
 };
 
+// Equivalent of Client on the server
 export class SpaceServer {
   public pagesPath: string;
   auth?: { user: string; pass: string };
@@ -47,6 +52,7 @@ export class SpaceServer {
   syncOnly: boolean;
   readOnly: boolean;
   shellBackend: ShellBackend;
+  enableSpaceScript: boolean;
 
   constructor(
     config: SpaceServerConfig,
@@ -60,6 +66,8 @@ export class SpaceServer {
     this.clientEncryption = !!config.clientEncryption;
     this.syncOnly = config.syncOnly;
     this.readOnly = config.readOnly;
+    this.enableSpaceScript = config.enableSpaceScript;
+
     if (this.clientEncryption) {
       // Sync only will forced on when encryption is enabled
       this.syncOnly = true;
@@ -95,6 +103,11 @@ export class SpaceServer {
       this.spacePrimitives = new ReadOnlySpacePrimitives(this.spacePrimitives);
     }
 
+    const ds = new DataStore(this.kvPrimitives);
+    const mq = new DataStoreMQ(ds);
+
+    const eventHook = new EventHook();
+
     // system = undefined in databaseless mode (no PlugOS instance on the server and no DB)
     if (!this.syncOnly) {
       // Enable server-side processing
@@ -102,7 +115,11 @@ export class SpaceServer {
         this.spacePrimitives,
         this.kvPrimitives,
         this.shellBackend,
+        mq,
+        ds,
+        eventHook,
         this.readOnly,
+        this.enableSpaceScript,
       );
       this.serverSystem = serverSystem;
     }

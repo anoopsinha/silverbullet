@@ -1,49 +1,56 @@
 import { readonlyMode } from "./cm_plugins/readonly.ts";
 import customMarkdownStyle from "./style.ts";
 import {
+  history,
+  historyKeymap,
+  indentWithTab,
+  standardKeymap,
+} from "@codemirror/commands";
+import {
   autocompletion,
   closeBrackets,
   closeBracketsKeymap,
-  codeFolding,
   completionKeymap,
-  drawSelection,
-  dropCursor,
-  EditorState,
-  EditorView,
-  highlightSpecialChars,
-  history,
-  historyKeymap,
+} from "@codemirror/autocomplete";
+import {
+  codeFolding,
   indentOnInput,
-  indentWithTab,
-  KeyBinding,
-  keymap,
   LanguageDescription,
   LanguageSupport,
-  markdown,
-  standardKeymap,
   syntaxHighlighting,
+} from "@codemirror/language";
+import { EditorState } from "@codemirror/state";
+import {
+  drawSelection,
+  dropCursor,
+  EditorView,
+  highlightSpecialChars,
+  KeyBinding,
+  keymap,
   ViewPlugin,
   ViewUpdate,
-} from "../common/deps.ts";
+} from "@codemirror/view";
+import { vim } from "@replit/codemirror-vim";
+import { markdown } from "@codemirror/lang-markdown";
 import { Client } from "./client.ts";
-import { vim } from "./deps.ts";
 import { inlineImagesPlugin } from "./cm_plugins/inline_image.ts";
 import { cleanModePlugins } from "./cm_plugins/clean.ts";
 import { lineWrapper } from "./cm_plugins/line_wrapper.ts";
 import { smartQuoteKeymap } from "./cm_plugins/smart_quotes.ts";
-import { safeRun } from "../common/util.ts";
-import { ClickEvent } from "$sb/app_event.ts";
+import { ClickEvent } from "../plug-api/types.ts";
 import {
   attachmentExtension,
   pasteLinkExtension,
 } from "./cm_plugins/editor_paste.ts";
-import { TextChange } from "$sb/lib/change.ts";
+import { TextChange } from "./change.ts";
 import { postScriptPrefacePlugin } from "./cm_plugins/top_bottom_panels.ts";
-import { languageFor } from "../common/languages.ts";
+import { languageFor } from "$common/languages.ts";
 import { plugLinter } from "./cm_plugins/lint.ts";
 import { Compartment, Extension } from "@codemirror/state";
-import { extendedMarkdownLanguage } from "../common/markdown_parser/parser.ts";
-import { parseCommand } from "../common/command.ts";
+import { extendedMarkdownLanguage } from "$common/markdown_parser/parser.ts";
+import { parseCommand } from "$common/command.ts";
+import { safeRun } from "$lib/async.ts";
+import { codeCopyPlugin } from "./cm_plugins/code_copy.ts";
 
 export function createEditorState(
   client: Client,
@@ -99,12 +106,13 @@ export function createEditorState(
       autocompletion({
         override: [
           client.editorComplete.bind(client),
-          client.system.slashCommandHook.slashCommandCompleter.bind(
-            client.system.slashCommandHook,
+          client.clientSystem.slashCommandHook.slashCommandCompleter.bind(
+            client.clientSystem.slashCommandHook,
           ),
         ],
       }),
       inlineImagesPlugin(client),
+      codeCopyPlugin(client),
       highlightSpecialChars(),
       history(),
       drawSelection(),
@@ -299,10 +307,10 @@ export function createCommandKeyBindings(client: Client): KeyBinding[] {
   }
 
   // Then add bindings for plug commands
-  for (const def of client.system.commandHook.editorCommands.values()) {
+  for (const def of client.clientSystem.commandHook.editorCommands.values()) {
     if (def.command.key) {
       // If we've already overridden this command, skip it
-      if (overriddenCommands.has(def.command.key)) {
+      if (overriddenCommands.has(def.command.name)) {
         continue;
       }
       commandKeyBindings.push({
@@ -345,7 +353,6 @@ export function createKeyBindings(client: Client): Extension {
     ...smartQuoteKeymap,
     ...closeBracketsKeymap,
     ...standardKeymap,
-    ...historyKeymap,
     ...completionKeymap,
     indentWithTab,
   ]);

@@ -1,6 +1,6 @@
-import type { ClickEvent, IndexTreeEvent } from "$sb/app_event.ts";
+import type { ClickEvent, IndexTreeEvent } from "../../plug-api/types.ts";
 
-import { editor, markdown, space, sync } from "$sb/syscalls.ts";
+import { editor, events, markdown, space, sync } from "$sb/syscalls.ts";
 
 import {
   addParentPointers,
@@ -13,15 +13,15 @@ import {
   renderToText,
   replaceNodesMatching,
   traverseTreeAsync,
-} from "$sb/lib/tree.ts";
-import { niceDate } from "$sb/lib/dates.ts";
+} from "../../plug-api/lib/tree.ts";
+import { niceDate } from "$lib/dates.ts";
 import { extractAttributes } from "$sb/lib/attribute.ts";
 import { rewritePageRefs } from "$sb/lib/resolve.ts";
-import { ObjectValue } from "$sb/types.ts";
+import { ObjectValue } from "../../plug-api/types.ts";
 import { indexObjects, queryObjects } from "../index/plug_api.ts";
 import { updateITags } from "$sb/lib/tags.ts";
 import { extractFrontmatter } from "$sb/lib/frontmatter.ts";
-import { parsePageRef } from "$sb/lib/page.ts";
+import { parsePageRef } from "$sb/lib/page_ref.ts";
 
 export type TaskObject = ObjectValue<
   {
@@ -91,16 +91,22 @@ export async function indexTasks({ name, tree }: IndexTreeEvent) {
           task.tags = [];
         }
         task.tags.push(tagName);
+        tree.children = [];
       }
     });
 
     // Extract attributes and remove from tree
-    const extractedAttributes = await extractAttributes(n, true);
+    task.name = n.children!.slice(1).map(renderToText).join("").trim();
+    const extractedAttributes = await extractAttributes(
+      ["task", ...task.tags || []],
+      n,
+      true,
+    );
+    task.name = n.children!.slice(1).map(renderToText).join("").trim();
+
     for (const [key, value] of Object.entries(extractedAttributes)) {
       task[key] = value;
     }
-
-    task.name = n.children!.slice(1).map(renderToText).join("").trim();
 
     updateITags(task, frontmatter);
 
@@ -185,6 +191,13 @@ async function cycleTaskState(
       await updateTaskState(ref, stateText, changeTo);
     }
   }
+
+  await events.dispatchEvent("task:stateChange", {
+    from: node.parent!.from,
+    to: node.parent!.to,
+    newState: changeTo,
+    text: renderToText(node.parent),
+  });
 }
 
 export async function updateTaskState(

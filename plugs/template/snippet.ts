@@ -1,37 +1,49 @@
-import { CompleteEvent, SlashCompletion } from "$sb/app_event.ts";
-import { editor, markdown, space } from "$sb/syscalls.ts";
+import {
+  CompleteEvent,
+  SlashCompletionOption,
+  SlashCompletions,
+} from "../../plug-api/types.ts";
+import { editor, markdown, space, YAML } from "$sb/syscalls.ts";
 import type { AttributeCompletion } from "../index/attributes.ts";
 import { queryObjects } from "../index/plug_api.ts";
 import { TemplateObject } from "./types.ts";
 import { loadPageObject } from "./page.ts";
 import { renderTemplate } from "./api.ts";
-import { prepareFrontmatterDispatch } from "$sb/lib/frontmatter.ts";
+import {
+  extractFrontmatter,
+  prepareFrontmatterDispatch,
+} from "$sb/lib/frontmatter.ts";
 import { SnippetConfig } from "./types.ts";
+import { deepObjectMerge } from "$sb/lib/json.ts";
 
 export async function snippetSlashComplete(
   completeEvent: CompleteEvent,
-): Promise<SlashCompletion[]> {
+): Promise<SlashCompletions> {
   const allTemplates = await queryObjects<TemplateObject>("template", {
     // where hooks.snippet.slashCommand exists
     filter: ["attr", ["attr", ["attr", "hooks"], "snippet"], "slashCommand"],
   }, 5);
-  return allTemplates.map((template) => {
-    const snippetTemplate = template.hooks!.snippet!;
+  return {
+    options: allTemplates.map((template) => {
+      const snippetTemplate = template.hooks!.snippet!;
 
-    return {
-      label: snippetTemplate.slashCommand,
-      detail: template.description,
-      order: snippetTemplate.order || 0,
-      templatePage: template.ref,
-      pageName: completeEvent.pageName,
-      invoke: "template.insertSnippetTemplate",
-    };
-  });
+      return {
+        label: snippetTemplate.slashCommand,
+        detail: template.description,
+        order: snippetTemplate.order || 0,
+        templatePage: template.ref,
+        pageName: completeEvent.pageName,
+        invoke: "template.insertSnippetTemplate",
+      };
+    }),
+  };
 }
 
-export async function insertSnippetTemplate(slashCompletion: SlashCompletion) {
+export async function insertSnippetTemplate(
+  slashCompletion: SlashCompletionOption,
+) {
   const pageObject = await loadPageObject(
-    slashCompletion.pageName,
+    slashCompletion.pageName || (await editor.getCurrentPage()),
   );
 
   const templateText = await space.readPage(slashCompletion.templatePage);
@@ -59,13 +71,39 @@ export async function insertSnippetTemplate(slashCompletion: SlashCompletion) {
   let cursorPos = await editor.getCursor();
 
   if (renderedFrontmatter) {
-    renderedFrontmatter = renderedFrontmatter.trim();
+    let parsedFrontmatter: Record<string, any> = {};
+    try {
+      parsedFrontmatter = await YAML.parse(renderedFrontmatter);
+    } catch (e: any) {
+      console.error(
+        `Invalid rendered for ${slashCompletion.templatePage}:`,
+        e.message,
+        "for frontmatter",
+        renderedFrontmatter,
+      );
+      await editor.flashNotification(
+        `Invalid frontmatter for ${slashCompletion.templatePage}, won't insert snippet`,
+        "error",
+      );
+      return;
+    }
     const pageText = await editor.getText();
     const tree = await markdown.parseMarkdown(pageText);
+    const currentFrontmatter = await extractFrontmatter(
+      tree,
+      parsedFrontmatter,
+    );
+    if (!currentFrontmatter.tags?.length) {
+      delete currentFrontmatter.tags;
+    }
+    const newFrontmatter = deepObjectMerge(
+      currentFrontmatter,
+      parsedFrontmatter,
+    );
 
     const dispatch = await prepareFrontmatterDispatch(
       tree,
-      renderedFrontmatter,
+      newFrontmatter,
     );
     if (cursorPos === 0) {
       dispatch.selection = { anchor: renderedFrontmatter.length + 9 };
@@ -110,6 +148,7 @@ export async function insertSnippetTemplate(slashCompletion: SlashCompletion) {
 
   if (snippetTemplate.match || snippetTemplate.matchRegex) {
     const pageText = await editor.getText();
+
     // Regex matching mode
     const matchRegex = new RegExp(
       (snippetTemplate.match || snippetTemplate.matchRegex)!,
@@ -119,21 +158,41 @@ export async function insertSnippetTemplate(slashCompletion: SlashCompletion) {
     while (startOfLine > 0 && pageText[startOfLine - 1] !== "\n") {
       startOfLine--;
     }
-    let currentLine = pageText.slice(startOfLine, cursorPos);
+    let endOfLine = cursorPos;
+    while (endOfLine < pageText.length && pageText[endOfLine] !== "\n") {
+      endOfLine++;
+    }
+    let currentLine = pageText.slice(startOfLine, endOfLine);
+    const caretParts = replacementText.split("|^|");
     const emptyLine = !currentLine;
-    currentLine = currentLine.replace(matchRegex, replacementText);
+    currentLine = currentLine.replace(matchRegex, caretParts[0]);
+
+    let newSelection = emptyLine
+      ? {
+        anchor: startOfLine + currentLine.length,
+      }
+      : undefined;
+
+    if (caretParts.length === 2) {
+      // The semantics of a caret in a replacement are:
+      // 1. It's a caret, so we need to move the cursor there
+      // 2. It's a placeholder, so we need to remove it
+      // 3. Any text after the caret should be inserted after the caret
+      const caretPos = currentLine.length;
+      // Now add the text after the caret
+      currentLine += caretParts[1];
+      newSelection = {
+        anchor: startOfLine + caretPos,
+      };
+    }
 
     await editor.dispatch({
       changes: {
         from: startOfLine,
-        to: cursorPos,
+        to: endOfLine,
         insert: currentLine,
       },
-      selection: emptyLine
-        ? {
-          anchor: startOfLine + currentLine.length,
-        }
-        : undefined,
+      selection: newSelection,
     });
   } else {
     const carretPos = replacementText.indexOf("|^|");
