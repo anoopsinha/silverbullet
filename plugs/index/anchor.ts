@@ -1,8 +1,8 @@
 import { collectNodesOfType } from "$sb/lib/tree.ts";
-import type { CompleteEvent, IndexTreeEvent } from "$sb/app_event.ts";
-import { ObjectValue, QueryExpression } from "$sb/types.ts";
+import type { CompleteEvent, IndexTreeEvent } from "../../plug-api/types.ts";
+import { ObjectValue, QueryExpression } from "../../plug-api/types.ts";
 import { indexObjects, queryObjects } from "./api.ts";
-import { parsePageRef } from "$sb/lib/page.ts";
+import { parsePageRef } from "$sb/lib/page_ref.ts";
 
 type AnchorObject = ObjectValue<{
   name: string;
@@ -12,9 +12,16 @@ type AnchorObject = ObjectValue<{
 
 export async function indexAnchors({ name: pageName, tree }: IndexTreeEvent) {
   const anchors: ObjectValue<AnchorObject>[] = [];
+  const anchorNames = new Set<string>();
 
   collectNodesOfType(tree, "NamedAnchor").forEach((n) => {
     const aName = n.children![0].text!.substring(1);
+    if (anchorNames.has(aName)) {
+      console.warn("Duplicate anchor", aName, "in", pageName);
+      return;
+    } else {
+      anchorNames.add(aName);
+    }
     anchors.push({
       ref: `${pageName}$${aName}`,
       tag: "anchor",

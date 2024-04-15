@@ -1,67 +1,64 @@
-// Third party web dependencies
-import {
-  Compartment,
-  CompletionContext,
-  CompletionResult,
-  EditorView,
-  gitIgnoreCompiler,
-  SyntaxNode,
-  syntaxTree,
-} from "../common/deps.ts";
-import { Space } from "./space.ts";
-import { FilterOption } from "./types.ts";
-import { ensureAndLoadSettingsAndIndex } from "../common/util.ts";
-import { EventHook } from "../plugos/hooks/event.ts";
-import { AppCommand } from "./hooks/command.ts";
+import { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
+import type { Compartment } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
+import { syntaxTree } from "@codemirror/language";
+import { compile as gitIgnoreCompiler } from "gitignore-parser";
+import { SyntaxNode } from "@lezer/common";
+import { Space } from "../common/space.ts";
+import { FilterOption } from "$lib/web.ts";
+import { EventHook } from "../common/hooks/event.ts";
+import { AppCommand } from "$lib/command.ts";
 import {
   PageState,
   parsePageRefFromURI,
   PathPageNavigator,
 } from "./navigator.ts";
 
-import { AppViewState, BuiltinSettings } from "./types.ts";
+import { AppViewState, BuiltinSettings } from "../type/web.ts";
 
-import type { AppEvent, CompleteEvent } from "../plug-api/app_event.ts";
-import { throttle } from "$sb/lib/async.ts";
-import { PlugSpacePrimitives } from "../common/spaces/plug_space_primitives.ts";
-import { EventedSpacePrimitives } from "../common/spaces/evented_space_primitives.ts";
+import type {
+  AppEvent,
+  CompleteEvent,
+  SlashCompletions,
+} from "../plug-api/types.ts";
+import { StyleObject } from "../plugs/index/style.ts";
+import { throttle } from "$lib/async.ts";
+import { PlugSpacePrimitives } from "$common/spaces/plug_space_primitives.ts";
+import { EventedSpacePrimitives } from "$common/spaces/evented_space_primitives.ts";
 import {
   ISyncService,
   NoSyncSyncService,
   pageSyncInterval,
   SyncService,
 } from "./sync_service.ts";
-import { simpleHash } from "../common/crypto.ts";
-import { SyncStatus } from "../common/spaces/sync.ts";
-import { HttpSpacePrimitives } from "../common/spaces/http_space_primitives.ts";
-import { FallbackSpacePrimitives } from "../common/spaces/fallback_space_primitives.ts";
-import { FilteredSpacePrimitives } from "../common/spaces/filtered_space_primitives.ts";
-import { encodePageRef, validatePageName } from "$sb/lib/page.ts";
+import { simpleHash } from "$lib/crypto.ts";
+import { SyncStatus } from "$common/spaces/sync.ts";
+import { HttpSpacePrimitives } from "$common/spaces/http_space_primitives.ts";
+import { FallbackSpacePrimitives } from "$common/spaces/fallback_space_primitives.ts";
+import { FilteredSpacePrimitives } from "$common/spaces/filtered_space_primitives.ts";
+import { encodePageRef, validatePageName } from "$sb/lib/page_ref.ts";
 import { ClientSystem } from "./client_system.ts";
 import { createEditorState } from "./editor_state.ts";
 import { MainUI } from "./editor_ui.tsx";
 import { cleanPageRef } from "$sb/lib/resolve.ts";
-import { SpacePrimitives } from "../common/spaces/space_primitives.ts";
-import { CodeWidgetButton, FileMeta, PageMeta } from "$sb/types.ts";
-import { DataStore } from "../plugos/lib/datastore.ts";
-import { IndexedDBKvPrimitives } from "../plugos/lib/indexeddb_kv_primitives.ts";
-import { DataStoreMQ } from "../plugos/lib/mq.datastore.ts";
-import { DataStoreSpacePrimitives } from "../common/spaces/datastore_space_primitives.ts";
+import { SpacePrimitives } from "$common/spaces/space_primitives.ts";
+import { CodeWidgetButton, FileMeta, PageMeta } from "../plug-api/types.ts";
+import { DataStore } from "$lib/data/datastore.ts";
+import { IndexedDBKvPrimitives } from "$lib/data/indexeddb_kv_primitives.ts";
+import { DataStoreMQ } from "$lib/data/mq.datastore.ts";
+import { DataStoreSpacePrimitives } from "$common/spaces/datastore_space_primitives.ts";
 import {
   EncryptedSpacePrimitives,
-} from "../common/spaces/encrypted_space_primitives.ts";
+} from "$common/spaces/encrypted_space_primitives.ts";
 
-import {
-  ensureSpaceIndex,
-  markFullSpaceIndexComplete,
-} from "../common/space_index.ts";
-import { LimitedMap } from "$sb/lib/limited_map.ts";
-import { renderTheTemplate } from "../common/syscalls/template.ts";
-import { buildQueryFunctions } from "../common/query_functions.ts";
-import { PageRef } from "$sb/lib/page.ts";
-import { ReadOnlySpacePrimitives } from "../common/spaces/ro_space_primitives.ts";
-import { KvPrimitives } from "../plugos/lib/kv_primitives.ts";
-import { builtinFunctions } from "$sb/lib/builtin_query_functions.ts";
+import { ensureSpaceIndex } from "$common/space_index.ts";
+import { renderTheTemplate } from "$common/syscalls/template.ts";
+import { PageRef } from "../plug-api/lib/page_ref.ts";
+import { ReadOnlySpacePrimitives } from "$common/spaces/ro_space_primitives.ts";
+import { KvPrimitives } from "$lib/data/kv_primitives.ts";
+import { builtinFunctions } from "$lib/builtin_query_functions.ts";
+import { ensureAndLoadSettingsAndIndex } from "$common/settings.ts";
+import { LimitedMap } from "$lib/limited_map.ts";
 const frontMatterRegex = /^---\n(([^\n]|\n)*?)---\n/;
 
 const autoSaveInterval = 1000;
@@ -74,6 +71,7 @@ declare global {
       syncOnly: boolean;
       readOnly: boolean;
       clientEncryption: boolean;
+      enableSpaceScript: boolean;
     };
     client: Client;
   }
@@ -82,7 +80,7 @@ declare global {
 // history.scrollRestoration = "manual";
 
 export class Client {
-  system!: ClientSystem;
+  clientSystem!: ClientSystem;
   editorView!: EditorView;
   keyHandlerCompartment?: Compartment;
 
@@ -115,8 +113,6 @@ export class Client {
   spaceKV?: KvPrimitives;
   mq!: DataStoreMQ;
 
-  // Used by the "wiki link" highlighter to check if a page exists
-  public allKnownPages = new Set<string>();
   onLoadPageRef: PageRef;
 
   constructor(
@@ -147,26 +143,16 @@ export class Client {
     // Setup message queue
     this.mq = new DataStoreMQ(this.stateDataStore);
 
-    setInterval(() => {
-      // Timeout after 5s, retries 3 times, otherwise drops the message (no DLQ)
-      this.mq.requeueTimeouts(5000, 3, true).catch(console.error);
-    }, 20000); // Look to requeue every 20s
     // Event hook
     this.eventHook = new EventHook();
 
     // Instantiate a PlugOS system
-    this.system = new ClientSystem(
+    this.clientSystem = new ClientSystem(
       this,
       this.mq,
       this.stateDataStore,
       this.eventHook,
       window.silverBulletConfig.readOnly,
-    );
-
-    // Swap in the expanded function map
-    this.stateDataStore.functionMap = buildQueryFunctions(
-      this.allKnownPages,
-      this.system.system,
     );
 
     const localSpacePrimitives = await this.initSpace();
@@ -198,7 +184,7 @@ export class Client {
 
     this.focus();
 
-    this.system.init();
+    this.clientSystem.init();
 
     await this.loadSettings();
 
@@ -229,6 +215,8 @@ export class Client {
     }
 
     await this.loadPlugs();
+    await this.clientSystem.loadSpaceScripts();
+
     await this.initNavigator();
     await this.initSync();
 
@@ -263,7 +251,7 @@ export class Client {
     this.syncService.start();
 
     // We're still booting, if a initial sync has already been completed we know this is the initial sync
-    const initialSync = !await this.syncService.hasInitialSyncCompleted();
+    let initialSync = !await this.syncService.hasInitialSyncCompleted();
 
     this.eventHook.addLocalListener("sync:success", async (operations) => {
       // console.log("Operations", operations);
@@ -280,12 +268,19 @@ export class Client {
         // A full sync just completed
         if (!initialSync) {
           // If this was NOT the initial sync let's check if we need to perform a space reindex
-          ensureSpaceIndex(this.stateDataStore, this.system.system).catch(
+          ensureSpaceIndex(this.stateDataStore, this.clientSystem.system).catch(
             console.error,
           );
-        } else {
-          // This was the initial sync, let's mark a full index as completed
-          await markFullSpaceIndexComplete(this.stateDataStore);
+        } else { // initialSync
+          // Let's load space scripts, which probably weren't loaded before
+          await this.clientSystem.loadSpaceScripts();
+          console.log(
+            "Initial sync completed, now need to do a full space index to ensure all pages are indexed using any custom space script indexers",
+          );
+          ensureSpaceIndex(this.stateDataStore, this.clientSystem.system).catch(
+            console.error,
+          );
+          initialSync = false;
         }
       }
       if (operations) {
@@ -332,7 +327,6 @@ export class Client {
           pageState.header !== undefined))
     ) {
       setTimeout(() => {
-        console.log("Kicking off scroll to", pageState.scrollTop);
         this.editorView.scrollDOM.scrollTop = pageState.scrollTop!;
       });
       adjustedPosition = true;
@@ -536,7 +530,7 @@ export class Client {
 
     this.plugSpaceRemotePrimitives = new PlugSpacePrimitives(
       remoteSpacePrimitives,
-      this.system.namespaceHook,
+      this.clientSystem.namespaceHook,
       this.syncMode ? undefined : "client",
     );
 
@@ -560,7 +554,7 @@ export class Client {
             new DataStoreSpacePrimitives(
               new DataStore(
                 spaceKvPrimitives,
-                buildQueryFunctions(this.allKnownPages, this.system.system),
+                {},
               ),
             ),
             this.plugSpaceRemotePrimitives,
@@ -593,23 +587,37 @@ export class Client {
       this.eventHook,
     );
 
+    let lastSaveTimestamp: number | undefined;
+
+    this.eventHook.addLocalListener("editor:pageSaving", () => {
+      lastSaveTimestamp = Date.now();
+    });
+
     this.eventHook.addLocalListener(
       "file:changed",
       (
         path: string,
-        _localChange?: boolean,
-        oldHash?: number,
-        newHash?: number,
+        _localChange: boolean,
+        oldHash: number,
+        newHash: number,
       ) => {
         // Only reload when watching the current page (to avoid reloading when switching pages)
         if (
-          this.space.watchInterval && `${this.currentPage}.md` === path
+          this.space.watchInterval && `${this.currentPage}.md` === path &&
+          // Avoid reloading if the page was just saved (5s window)
+          (!lastSaveTimestamp || (lastSaveTimestamp < Date.now() - 5000))
         ) {
           console.log(
             "Page changed elsewhere, reloading. Old hash",
             oldHash,
             "new hash",
             newHash,
+          );
+          console.log(
+            "Last save timestamp",
+            lastSaveTimestamp,
+            "now",
+            Date.now(),
           );
           this.flashNotification("Page changed elsewhere, reloading");
           this.reloadPage();
@@ -620,21 +628,21 @@ export class Client {
     // Caching a list of known pages for the wiki_link highlighter (that checks if a page exists)
     this.eventHook.addLocalListener("page:saved", (pageName: string) => {
       // Make sure this page is in the list of known pages
-      this.allKnownPages.add(pageName);
+      this.clientSystem.allKnownPages.add(pageName);
     });
 
     this.eventHook.addLocalListener("page:deleted", (pageName: string) => {
-      this.allKnownPages.delete(pageName);
+      this.clientSystem.allKnownPages.delete(pageName);
     });
 
     this.eventHook.addLocalListener(
       "file:listed",
       (allFiles: FileMeta[]) => {
         // Update list of known pages
-        this.allKnownPages.clear();
+        this.clientSystem.allKnownPages.clear();
         allFiles.forEach((f) => {
           if (f.name.endsWith(".md")) {
-            this.allKnownPages.add(f.name.slice(0, -3));
+            this.clientSystem.allKnownPages.add(f.name.slice(0, -3));
           }
         });
       },
@@ -671,6 +679,10 @@ export class Client {
               return resolve();
             }
             console.log("Saving page", this.currentPage);
+            this.dispatchAppEvent(
+              "editor:pageSaving",
+              this.currentPage,
+            );
             this.space
               .writePage(
                 this.currentPage,
@@ -733,7 +745,11 @@ export class Client {
 
   async updatePageListCache() {
     console.log("Updating page list cache");
-    const allPages = await this.system.queryObjects<PageMeta>("page", {});
+    if (!this.clientSystem.system.loadedPlugs.has("index")) {
+      console.warn("Index plug not loaded, cannot update page list cache");
+      return;
+    }
+    const allPages = await this.clientSystem.queryObjects<PageMeta>("page", {});
     this.ui.viewDispatch({
       type: "update-page-list",
       allPages,
@@ -816,7 +832,7 @@ export class Client {
   }
 
   async loadPlugs() {
-    await this.system.reloadPlugsFromSpace(this.space);
+    await this.clientSystem.reloadPlugsFromSpace(this.space);
     await this.eventHook.dispatchEvent("system:ready");
     await this.dispatchAppEvent("plugs:loaded");
   }
@@ -846,7 +862,7 @@ export class Client {
   async completeWithEvent(
     context: CompletionContext,
     eventName: AppEvent,
-  ): Promise<CompletionResult | null> {
+  ): Promise<CompletionResult | SlashCompletions | null> {
     const editorState = context.state;
     const selection = editorState.selection.main;
     const line = editorState.doc.lineAt(selection.from);
@@ -874,33 +890,53 @@ export class Client {
       pos: selection.from,
       parentNodes,
     } as CompleteEvent);
-    let actualResult = null;
+    let currentResult: CompletionResult | null = null;
     for (const result of results) {
-      if (result) {
-        if (actualResult) {
+      if (!result) {
+        continue;
+      }
+      if (currentResult) {
+        // Let's see if we can merge results
+        if (currentResult.from !== result.from) {
           console.error(
-            "Got completion results from multiple sources, cannot deal with that",
+            "Got completion results from multiple sources with different `from` locators, cannot deal with that",
           );
-          console.error("Previously had", actualResult, "now also got", result);
+          console.error(
+            "Previously had",
+            currentResult,
+            "now also got",
+            result,
+          );
           return null;
+        } else {
+          // Merge
+          currentResult = {
+            from: result.from,
+            options: [...currentResult.options, ...result.options],
+          };
         }
-        actualResult = result;
+      } else {
+        currentResult = result;
       }
     }
     // console.log("Compeltion result", actualResult);
-    return actualResult;
+    return currentResult;
   }
 
   editorComplete(
     context: CompletionContext,
   ): Promise<CompletionResult | null> {
-    return this.completeWithEvent(context, "editor:complete");
+    return this.completeWithEvent(context, "editor:complete") as Promise<
+      CompletionResult | null
+    >;
   }
 
   miniEditorComplete(
     context: CompletionContext,
   ): Promise<CompletionResult | null> {
-    return this.completeWithEvent(context, "minieditor:complete");
+    return this.completeWithEvent(context, "minieditor:complete") as Promise<
+      CompletionResult | null
+    >;
   }
 
   async reloadPage() {
@@ -920,6 +956,7 @@ export class Client {
         viewState.showPrompt,
       ].some(Boolean)
     ) {
+      // console.log("not focusing");
       // Some other modal UI element is visible, don't focus editor now
       return;
     }
@@ -953,7 +990,7 @@ export class Client {
         "Navigating to new page in new window",
         `${location.origin}/${encodePageRef(pageRef)}`,
       );
-      const win = window.open(
+      const win = globalThis.open(
         `${location.origin}/${encodePageRef(pageRef)}`,
         "_blank",
       );
@@ -1009,13 +1046,14 @@ export class Client {
             perm: "rw",
           } as PageMeta,
         };
-        this.system.system.invokeFunction("template.newPage", [pageName]).then(
-          () => {
-            this.focus();
-          },
-        ).catch(
-          console.error,
-        );
+        this.clientSystem.system.invokeFunction("template.newPage", [pageName])
+          .then(
+            () => {
+              this.focus();
+            },
+          ).catch(
+            console.error,
+          );
       } else {
         this.flashNotification(
           `Could not load page ${pageName}: ${e.message}`,
@@ -1069,31 +1107,32 @@ export class Client {
   }
 
   async loadCustomStyles() {
-    if (this.settings.customStyles) {
-      const accumulatedCSS: string[] = [];
-      let customStylePages = this.settings.customStyles;
-      if (!Array.isArray(customStylePages)) {
-        customStylePages = [customStylePages];
-      }
-      for (const customStylesPage of customStylePages) {
-        try {
-          const { text: stylesText } = await this.space.readPage(
-            cleanPageRef(customStylesPage),
-          );
-          const cssBlockRegex = /```css([^`]+)```/;
-          const match = cssBlockRegex.exec(stylesText);
-          if (!match) {
-            return;
-          }
-          accumulatedCSS.push(match[1]);
-        } catch (e: any) {
-          console.error("Failed to load custom styles", e);
-        }
-      }
-      document.getElementById("custom-styles")!.innerHTML = accumulatedCSS.join(
-        "\n\n",
-      );
+    const spaceStyles = await this.clientSystem.queryObjects<StyleObject>(
+      "space-style",
+      {},
+    );
+    if (!spaceStyles) {
+      return;
     }
+
+    // Sort stylesheets (last declared styles take precedence)
+    // Order is 1: Imported styles, 2: Other styles, 3: customStyles from Settings
+    const sortOrder = ["library", "user", "settings"];
+    spaceStyles.sort((a, b) =>
+      sortOrder.indexOf(a.origin) - sortOrder.indexOf(b.origin)
+    );
+
+    const accumulatedCSS: string[] = [];
+    for (const s of spaceStyles) {
+      accumulatedCSS.push(s.style);
+    }
+    const customStylesContent = accumulatedCSS.join("\n\n");
+    this.ui.viewDispatch({
+      type: "set-ui-option",
+      key: "customStyles",
+      value: customStylesContent,
+    });
+    document.getElementById("custom-styles")!.innerHTML = customStylesContent;
   }
 
   async runCommandByName(name: string, args?: any[]) {

@@ -1,4 +1,4 @@
-import { CompleteEvent } from "$sb/app_event.ts";
+import { CompleteEvent } from "../../plug-api/types.ts";
 import { datastore, events } from "$sb/syscalls.ts";
 
 import {
@@ -28,7 +28,7 @@ export async function templateAttributeComplete(completeEvent: CompleteEvent) {
   const functions = await datastore.listFunctions();
   allCompletions = functions.map((name) => ({
     label: name,
-    apply: `${name}(`,
+    apply: name,
     detail: "function",
   }));
 

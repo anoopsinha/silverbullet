@@ -1,18 +1,22 @@
-import { editor, space } from "$sb/silverbullet-syscall/mod.ts";
-import { UploadFile } from "$sb/types.ts";
+import { readSetting } from "$sb/lib/settings_page.ts";
+import { editor, space } from "$sb/syscalls.ts";
+import { UploadFile } from "../../plug-api/types.ts";
+import { maximumAttachmentSize } from "../../web/constants.ts";
 
-const maximumAttachmentSize = 1024 * 1024 * 10; // 10MB
 
 function folderName(path: string) {
   return path.split("/").slice(0, -1).join("/");
 }
 
 async function saveFile(file: UploadFile) {
-  if (file.content.length > maximumAttachmentSize) {
+  const maxSize = await readSetting("maximumAttachmentSize", maximumAttachmentSize);
+  if (typeof maxSize !== "number") {
+    await editor.flashNotification(
+      "The setting 'maximumAttachmentSize' must be a number", "error");
+  }
+  if (file.content.length > maxSize * 1024 * 1024) {
     editor.flashNotification(
-      `Attachment is too large, maximum is ${
-        maximumAttachmentSize / 1024 / 1024
-      }MB`,
+      `Attachment is too large, maximum is ${maxSize}MiB`,
       "error",
     );
     return;

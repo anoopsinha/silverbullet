@@ -5,13 +5,13 @@ import clientAssetBundle from "../dist/client_asset_bundle.json" assert {
 import plugAssetBundle from "../dist/plug_asset_bundle.json" assert {
   type: "json",
 };
-import { AssetBundle, AssetJson } from "../plugos/asset_bundle/bundle.ts";
-import { sleep } from "$sb/lib/async.ts";
+import { AssetBundle, AssetJson } from "../lib/asset_bundle/bundle.ts";
 
 import { determineDatabaseBackend } from "../server/db_backend.ts";
 import { SpaceServerConfig } from "../server/instance.ts";
-import { runPlug } from "../cli/plug_run.ts";
-import { PrefixedKvPrimitives } from "../plugos/lib/prefixed_kv_primitives.ts";
+import { runPlug } from "../cmd/plug_run.ts";
+import { PrefixedKvPrimitives } from "$lib/data/prefixed_kv_primitives.ts";
+import { sleep } from "$lib/async.ts";
 
 export async function serveCommand(
   options: {
@@ -81,6 +81,7 @@ export async function serveCommand(
   }
 
   const backendConfig = Deno.env.get("SB_SHELL_BACKEND") || "local";
+  const enableSpaceScript = Deno.env.get("SB_SPACE_SCRIPT") !== "off";
 
   const configs = new Map<string, SpaceServerConfig>();
   configs.set("*", {
@@ -92,17 +93,28 @@ export async function serveCommand(
     readOnly,
     shellBackend: backendConfig,
     clientEncryption,
+    enableSpaceScript,
     pagesPath: folder,
   });
 
   const plugAssets = new AssetBundle(plugAssetBundle as AssetJson);
 
   if (readOnly) {
-    console.log("Indexing the space first. Hang on...");
+    console.log("Performing initial space indexing...");
     await runPlug(
       folder,
       "index.reindexSpace",
       [],
+      plugAssets,
+      new PrefixedKvPrimitives(baseKvPrimitives, ["*"]),
+    );
+    console.log(
+      "Now indexing again to make sure any additional space script indexers are run...",
+    );
+    await runPlug(
+      folder,
+      "index.reindexSpace",
+      [true], // noClear
       plugAssets,
       new PrefixedKvPrimitives(baseKvPrimitives, ["*"]),
     );

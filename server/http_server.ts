@@ -1,23 +1,18 @@
-import {
-  Context,
-  cors,
-  deleteCookie,
-  getCookie,
-  Hono,
-  HonoRequest,
-  setCookie,
-} from "./deps.ts";
-import { AssetBundle } from "../plugos/asset_bundle/bundle.ts";
-import { FileMeta } from "$sb/types.ts";
-import { ShellRequest } from "./rpc.ts";
+import { deleteCookie, getCookie, setCookie } from "hono/helper.ts";
+import { cors } from "hono/middleware.ts";
+import { type Context, Hono, type HonoRequest } from "hono/mod.ts";
+import { AssetBundle } from "../lib/asset_bundle/bundle.ts";
+import { FileMeta } from "../plug-api/types.ts";
+import { ShellRequest } from "../type/rpc.ts";
 import { SpaceServer, SpaceServerConfig } from "./instance.ts";
-import { KvPrimitives } from "../plugos/lib/kv_primitives.ts";
-import { PrefixedKvPrimitives } from "../plugos/lib/prefixed_kv_primitives.ts";
-import { base64Encode } from "../plugos/asset_bundle/base64.ts";
-import { extendedMarkdownLanguage } from "../common/markdown_parser/parser.ts";
-import { parse } from "../common/markdown_parser/parse_tree.ts";
+import { KvPrimitives } from "$lib/data/kv_primitives.ts";
+import { PrefixedKvPrimitives } from "$lib/data/prefixed_kv_primitives.ts";
+import { extendedMarkdownLanguage } from "$common/markdown_parser/parser.ts";
+import { parse } from "$common/markdown_parser/parse_tree.ts";
 import { renderMarkdownToHtml } from "../plugs/markdown/markdown_render.ts";
-import { parsePageRef } from "$sb/lib/page.ts";
+import { parsePageRef } from "$sb/lib/page_ref.ts";
+import { base64Encode } from "$lib/crypto.ts";
+import * as path from "$std/path/mod.ts";
 
 const authenticationExpirySeconds = 60 * 60 * 24 * 7; // 1 week
 
@@ -158,6 +153,9 @@ export class HttpServer {
         "{{SYNC_ONLY}}",
         spaceServer.syncOnly ? "true" : "false",
       ).replace(
+        "{{ENABLE_SPACE_SCRIPT}}",
+        spaceServer.enableSpaceScript ? "true" : "false",
+      ).replace(
         "{{READ_ONLY}}",
         spaceServer.readOnly ? "true" : "false",
       ).replace(
@@ -267,6 +265,7 @@ export class HttpServer {
                   spaceServer.clientEncryption,
                   spaceServer.syncOnly,
                   spaceServer.readOnly,
+                  spaceServer.enableSpaceScript,
                 ]),
               ),
             );
@@ -333,7 +332,7 @@ export class HttpServer {
     this.app.use("*", async (c, next) => {
       const req = c.req;
       const spaceServer = await this.ensureSpaceServer(req);
-      if (!spaceServer.auth) {
+      if (!spaceServer.auth && !spaceServer.authToken) {
         // Auth disabled in this config, skip
         return next();
       }
@@ -464,6 +463,7 @@ export class HttpServer {
     });
 
     const filePathRegex = "/:path{[^!].*\\.[a-zA-Z]+}";
+    const mdExt = ".md";
 
     this.app.get(
       filePathRegex,
@@ -476,7 +476,7 @@ export class HttpServer {
           name,
         );
         if (
-          name.endsWith(".md") &&
+          name.endsWith(mdExt) &&
           // This header signififies the requests comes directly from the http_space_primitives client (not the browser)
           !req.header("X-Sync-Mode") &&
           // This Accept header is used by federation to still work with CORS
@@ -488,7 +488,7 @@ export class HttpServer {
           console.warn(
             "Request was without X-Sync-Mode nor a CORS request, redirecting to page",
           );
-          return c.redirect(`/${name.slice(0, -3)}`);
+          return c.redirect(`/${name.slice(0, -mdExt.length)}`, 401);
         }
         if (name.startsWith(".")) {
           // Don't expose hidden files
@@ -520,6 +520,16 @@ export class HttpServer {
             return c.text(e.message, 500);
           }
         }
+
+        const filename = path.posix.basename(name, mdExt);
+        if (filename.trim() !== filename) {
+          const newName = path.posix.join(
+            path.posix.dirname(name),
+            filename.trim(),
+          );
+          return c.redirect(`/${newName}`);
+        }
+
         try {
           if (req.header("X-Get-Meta")) {
             // Getting meta via GET request
@@ -557,6 +567,11 @@ export class HttpServer {
         if (name.startsWith(".")) {
           // Don't expose hidden files
           return c.text("Forbidden", 403);
+        }
+
+        const filename = path.posix.basename(name, mdExt);
+        if (filename.trim() !== filename) {
+          return c.text("Malformed filename", 400);
         }
 
         const body = await req.arrayBuffer();

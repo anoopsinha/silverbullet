@@ -1,6 +1,7 @@
 import { resolveAttachmentPath } from "$sb/lib/resolve.ts";
 import { Client } from "../client.ts";
-import { Decoration, syntaxTree } from "../deps.ts";
+import { syntaxTree } from "@codemirror/language";
+import { Decoration } from "@codemirror/view";
 import {
   decoratorStateField,
   invisibleDecoration,
@@ -57,6 +58,7 @@ export function linkPlugin(client: Client) {
             attributes: {
               href: cleanLink,
               title: `Click to visit ${cleanLink}`,
+              contenteditable: "false",
             },
           }).range(from + 1, from + cleanAnchor.length + 1),
         );

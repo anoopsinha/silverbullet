@@ -1,21 +1,21 @@
 import { Client } from "../client.ts";
 import {
-  EditorView,
   foldAll,
   foldCode,
   toggleFold,
-  Transaction,
   unfoldAll,
   unfoldCode,
-  Vim,
-  vimGetCm,
-} from "../deps.ts";
-import { SysCallMapping } from "../../plugos/system.ts";
-import type { FilterOption } from "../types.ts";
+} from "@codemirror/language";
+import { redo, undo } from "@codemirror/commands";
+import { Transaction } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
+import { getCM as vimGetCm, Vim } from "@replit/codemirror-vim";
+import { SysCallMapping } from "$lib/plugos/system.ts";
+import type { FilterOption } from "$lib/web.ts";
 import { UploadFile } from "../../plug-api/types.ts";
-import { PageRef } from "$sb/lib/page.ts";
-import { openSearchPanel } from "../deps.ts";
-import { diffAndPrepareChanges } from "./cm_util.ts";
+import { PageRef } from "$sb/lib/page_ref.ts";
+import { openSearchPanel } from "@codemirror/search";
+import { diffAndPrepareChanges } from "../cm_util.ts";
 
 export function editorSyscalls(client: Client): SysCallMapping {
   const syscalls: SysCallMapping = {
@@ -60,7 +60,14 @@ export function editorSyscalls(client: Client): SysCallMapping {
     },
     "editor.reloadSettingsAndCommands": async () => {
       await client.loadSettings();
-      await client.system.commandHook.buildAllCommands();
+      await client.clientSystem.system.localSyscall(
+        "system.loadSpaceScripts",
+        [],
+      );
+      await client.clientSystem.system.localSyscall(
+        "system.loadSpaceStyles",
+        [],
+      );
     },
     "editor.openUrl": (_ctx, url: string, existingWindow = false) => {
       if (!existingWindow) {
@@ -71,6 +78,9 @@ export function editorSyscalls(client: Client): SysCallMapping {
       } else {
         location.href = url;
       }
+    },
+    "editor.goHistory": (_ctx, delta: number) => {
+      window.history.go(delta);
     },
     "editor.downloadFile": (_ctx, filename: string, dataUrl: string) => {
       const link = document.createElement("a");
@@ -259,6 +269,7 @@ export function editorSyscalls(client: Client): SysCallMapping {
     "editor.openCommandPalette": () => {
       client.ui.viewDispatch({
         type: "show-palette",
+        context: client.getContext(),
       });
     },
     // Folding
@@ -277,8 +288,21 @@ export function editorSyscalls(client: Client): SysCallMapping {
     "editor.unfoldAll": () => {
       unfoldAll(client.editorView);
     },
+    "editor.undo": () => {
+      return undo(client.editorView);
+    },
+    "editor.redo": () => {
+      return redo(client.editorView);
+    },
     "editor.openSearchPanel": () => {
       openSearchPanel(client.editorView);
+    },
+    "editor.copyToClipboard": (_ctx, data: string | Blob) => {
+      if (typeof data === "string") {
+        navigator.clipboard.writeText(data);
+      } else {
+        navigator.clipboard.write([new ClipboardItem({ [data.type]: data })]);
+      }
     },
   };
 

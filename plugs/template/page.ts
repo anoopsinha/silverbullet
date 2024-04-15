@@ -1,5 +1,5 @@
 import { editor, space, template } from "$sb/syscalls.ts";
-import { PageMeta } from "$sb/types.ts";
+import { PageMeta } from "../../plug-api/types.ts";
 import { getObjectByRef, queryObjects } from "../index/plug_api.ts";
 import { FrontmatterConfig, TemplateObject } from "./types.ts";
 import { renderTemplate } from "./api.ts";
@@ -86,11 +86,12 @@ function selectPageTemplate(options: TemplateObject[]) {
   );
 }
 
-async function instantiatePageTemplate(
+export async function instantiatePageTemplate(
   templateName: string,
   intoCurrentPage: string | undefined,
   askName: boolean,
-) {
+  customData: any = undefined,
+): Promise<string | void> {
   const templateText = await space.readPage(templateName!);
 
   console.log(
@@ -107,6 +108,7 @@ async function instantiatePageTemplate(
     created: "",
     lastModified: "",
     perm: "rw",
+    data: customData,
   };
   // Just used to extract the frontmatter
   const { frontmatter } = await renderTemplate(
@@ -156,7 +158,7 @@ async function instantiatePageTemplate(
       if (newPageConfig.openIfExists) {
         console.log("Page already exists, navigating there");
         await editor.navigate({ page: pageName, pos: 0 });
-        return;
+        return pageName;
       }
 
       // let's warn
@@ -198,6 +200,7 @@ async function instantiatePageTemplate(
       pos: carretPos !== -1 ? carretPos : undefined,
     });
   }
+  return pageName;
 }
 
 export async function loadPageObject(pageName?: string): Promise<PageMeta> {

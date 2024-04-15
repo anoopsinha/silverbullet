@@ -1,4 +1,4 @@
-import { FunctionMap, QueryExpression } from "$sb/types.ts";
+import { FunctionMap, QueryExpression } from "../types.ts";
 
 export function evalQueryExpression(
   val: QueryExpression,
@@ -170,6 +170,12 @@ export function evalQueryExpression(
         return Promise.all(waitForPromises).then(() => fn(...argValues));
       } else {
         return fn(...argValues);
+      }
+    }
+    case "-": {
+      if (val.length == 2) { // only unary minus
+        const val = evalQueryExpression(op1, obj, variables, functionMap);
+        return -val;
       }
     }
   }

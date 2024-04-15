@@ -1,10 +1,11 @@
-import { FunctionMap } from "$sb/types.ts";
-import { AST } from "$sb/lib/tree.ts";
-import { SysCallMapping } from "../../plugos/system.ts";
-import { renderTemplate } from "../template/render.ts";
-import { parseTemplate } from "../template/template_parser.ts";
+import { FunctionMap } from "../../plug-api/types.ts";
+import { AST } from "../../plug-api/lib/tree.ts";
+import { SysCallMapping } from "$lib/plugos/system.ts";
+import { renderTemplate } from "$common/template/render.ts";
+import { parseTemplate } from "$common/template/template_parser.ts";
+import { DataStore } from "$lib/data/datastore.ts";
 
-export function templateSyscalls(functionMap: FunctionMap): SysCallMapping {
+export function templateSyscalls(ds: DataStore): SysCallMapping {
   return {
     "template.renderTemplate": (
       _ctx,
@@ -12,7 +13,7 @@ export function templateSyscalls(functionMap: FunctionMap): SysCallMapping {
       obj: any,
       globals: Record<string, any> = {},
     ): Promise<string> => {
-      return renderTheTemplate(template, obj, globals, functionMap);
+      return renderTheTemplate(template, obj, globals, ds.functionMap);
     },
     "template.parseTemplate": (
       _ctx,

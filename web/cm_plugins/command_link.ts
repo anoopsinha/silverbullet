@@ -1,5 +1,6 @@
-import { ClickEvent } from "$sb/app_event.ts";
-import { Decoration, syntaxTree } from "../deps.ts";
+import { ClickEvent } from "../../plug-api/types.ts";
+import { syntaxTree } from "@codemirror/language";
+import { Decoration } from "@codemirror/view";
 import { Client } from "../client.ts";
 import {
   ButtonWidget,
@@ -7,7 +8,7 @@ import {
   invisibleDecoration,
   isCursorInRange,
 } from "./util.ts";
-import { commandLinkRegex } from "../../common/command.ts";
+import { commandLinkRegex } from "$common/command.ts";
 
 /**
  * Plugin to hide path prefix when the cursor is not inside.

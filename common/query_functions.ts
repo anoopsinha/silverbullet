@@ -1,8 +1,8 @@
-import { FunctionMap } from "$sb/types.ts";
-import { builtinFunctions } from "$sb/lib/builtin_query_functions.ts";
-import { System } from "../plugos/system.ts";
-import { Query } from "$sb/types.ts";
-import { LimitedMap } from "$sb/lib/limited_map.ts";
+import { FunctionMap } from "../plug-api/types.ts";
+import { builtinFunctions } from "../lib/builtin_query_functions.ts";
+import { System } from "../lib/plugos/system.ts";
+import { Query } from "../plug-api/types.ts";
+import { LimitedMap } from "$lib/limited_map.ts";
 
 const pageCacheTtl = 10 * 1000; // 10s
 
@@ -11,16 +11,25 @@ export function buildQueryFunctions(
   system: System<any>,
 ): FunctionMap {
   const pageCache = new LimitedMap<string>(10);
+
   return {
     ...builtinFunctions,
     pageExists(name: string) {
+      if (typeof name !== "string") {
+        throw new Error("pageExists(): name is not a string");
+      }
+
       if (name.startsWith("!") || name.startsWith("{{")) {
         // Let's assume federated pages exist, and ignore template variable ones
         return true;
       }
       return allKnownPages.has(name);
     },
-    async template(template: string, obj: any) {
+    async template(template: unknown, obj: unknown) {
+      if (typeof template !== "string") {
+        throw new Error("template(): template is not a string");
+      }
+
       return (await system.invokeFunction("template.renderTemplate", [
         template,
         obj,
@@ -39,7 +48,7 @@ export function buildQueryFunctions(
       if (cachedPage) {
         return cachedPage;
       } else {
-        return system.syscall({}, "space.readPage", [name]).then((page) => {
+        return system.localSyscall("space.readPage", [name]).then((page) => {
           pageCache.set(name, page, pageCacheTtl);
           return page;
         }).catch((e: any) => {

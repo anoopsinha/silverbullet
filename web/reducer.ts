@@ -1,4 +1,4 @@
-import { Action, AppViewState } from "./types.ts";
+import { Action, AppViewState } from "../type/web.ts";
 
 export default function reducer(
   state: AppViewState,
@@ -18,10 +18,12 @@ export default function reducer(
           bottom: {},
         },
       };
-    case "page-loaded":
+    case "page-loaded": {
+      const mouseDetected = window.matchMedia("(any-pointer:fine)").matches;
       return {
         ...state,
         isLoading: false,
+        isMobile: !mouseDetected,
         allPages: state.allPages.map((pageMeta) =>
           pageMeta.name === action.meta.name
             ? { ...pageMeta, lastOpened: Date.now() }
@@ -30,6 +32,7 @@ export default function reducer(
         currentPage: action.meta.name,
         currentPageMeta: action.meta,
       };
+    }
     case "page-changed":
       return {
         ...state,

@@ -1,12 +1,16 @@
-import { WidgetType } from "../deps.ts";
+import { WidgetType } from "@codemirror/view";
 import type { Client } from "../client.ts";
-import type { CodeWidgetButton, CodeWidgetCallback } from "$sb/types.ts";
+import type {
+  CodeWidgetButton,
+  CodeWidgetCallback,
+} from "../../plug-api/types.ts";
 import { renderMarkdownToHtml } from "../../plugs/markdown/markdown_render.ts";
 import { resolveAttachmentPath } from "$sb/lib/resolve.ts";
-import { parse } from "../../common/markdown_parser/parse_tree.ts";
-import { parsePageRef } from "$sb/lib/page.ts";
-import { extendedMarkdownLanguage } from "../../common/markdown_parser/parser.ts";
+import { parse } from "$common/markdown_parser/parse_tree.ts";
+import { parsePageRef } from "../../plug-api/lib/page_ref.ts";
+import { extendedMarkdownLanguage } from "$common/markdown_parser/parser.ts";
 import { tagPrefix } from "../../plugs/index/constants.ts";
+import { renderToText } from "$sb/lib/tree.ts";
 
 const activeWidgets = new Set<MarkdownWidget>();
 
@@ -64,13 +68,30 @@ export class MarkdownWidget extends WidgetType {
       extendedMarkdownLanguage,
       widgetContent.markdown!,
     );
-    mdTree = await this.client.system.localSyscall(
+    mdTree = await this.client.clientSystem.localSyscall(
       "system.invokeFunction",
       [
         "markdown.expandCodeWidgets",
         mdTree,
         this.client.currentPage,
       ],
+    );
+    const trimmedMarkdown = renderToText(mdTree).trim();
+
+    if (!trimmedMarkdown) {
+      // Net empty result after expansion
+      div.innerHTML = "";
+      this.client.setWidgetCache(
+        this.cacheKey,
+        { height: div.clientHeight, html: "" },
+      );
+      return;
+    }
+
+    // Parse the markdown again after trimming
+    mdTree = parse(
+      extendedMarkdownLanguage,
+      trimmedMarkdown,
     );
 
     const html = renderMarkdownToHtml(mdTree, {
@@ -89,7 +110,6 @@ export class MarkdownWidget extends WidgetType {
       },
       preserveAttributes: true,
     });
-    // console.log("Got html", html);
 
     if (cachedHtml === html) {
       // HTML still same as in cache, no need to re-render
@@ -163,7 +183,6 @@ export class MarkdownWidget extends WidgetType {
       const el = el_ as HTMLElement;
       // Override default click behavior with a local navigate (faster)
       el.addEventListener("click", (e) => {
-        console.log("Hashtag clicked", el.innerText);
         if (e.ctrlKey || e.metaKey) {
           // Don't do anything special for ctrl/meta clicks
           return;
@@ -215,7 +234,7 @@ export class MarkdownWidget extends WidgetType {
           // Update state in DOM as well for future toggles
           e.target.dataset.state = newState;
           console.log("Toggling task", taskRef);
-          this.client.system.localSyscall(
+          this.client.clientSystem.localSyscall(
             "system.invokeFunction",
             ["tasks.updateTaskState", taskRef, oldState, newState],
           ).catch(
@@ -234,7 +253,7 @@ export class MarkdownWidget extends WidgetType {
       if (button.widgetTarget) {
         div.addEventListener("click", () => {
           console.log("Widget clicked");
-          this.client.system.localSyscall("system.invokeFunction", [
+          this.client.clientSystem.localSyscall("system.invokeFunction", [
             button.invokeFunction,
             this.from,
           ]).catch(console.error);
@@ -244,10 +263,9 @@ export class MarkdownWidget extends WidgetType {
           "click",
           (e) => {
             e.stopPropagation();
-            console.log("Button clicked:", button.description);
-            this.client.system.localSyscall("system.invokeFunction", [
+            this.client.clientSystem.localSyscall("system.invokeFunction", [
               button.invokeFunction,
-              this.from,
+              this.bodyText,
             ]).then((newContent: string | undefined) => {
               if (newContent) {
                 div.innerText = newContent;

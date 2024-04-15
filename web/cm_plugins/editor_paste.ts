@@ -1,23 +1,21 @@
-import { EditorView, syntaxTree, ViewPlugin, ViewUpdate } from "../deps.ts";
+import { syntaxTree } from "@codemirror/language";
+import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { Client } from "../client.ts";
 
 // We use turndown to convert HTML to Markdown
-import TurndownService from "https://cdn.skypack.dev/turndown@7.1.1";
+import TurndownService from "turndown";
 
 // With tables and task notation as well
-import {
-  tables,
-  taskListItems,
-} from "https://cdn.skypack.dev/@joplin/turndown-plugin-gfm@1.0.45";
-import { safeRun } from "../../common/util.ts";
-import { lezerToParseTree } from "../../common/markdown_parser/parse_tree.ts";
+import { tables, taskListItems } from "turndown-plugin-gfm";
+import { lezerToParseTree } from "$common/markdown_parser/parse_tree.ts";
 import {
   addParentPointers,
   findParentMatching,
   nodeAtPos,
 } from "../../plug-api/lib/tree.ts";
-import { folderName, resolve } from "../../common/path.ts";
+import { folderName, resolve } from "$lib/path.ts";
 import { maximumAttachmentSize } from "../constants.ts";
+import { safeRun } from "$lib/async.ts";
 
 const turndownService = new TurndownService({
   hr: "---",
@@ -197,11 +195,10 @@ export function attachmentExtension(editor: Client) {
     suggestedName: string,
     mimeType: string,
   ) {
-    if (data!.byteLength > maximumAttachmentSize) {
+    const maxSize = editor.settings.maximumAttachmentSize || maximumAttachmentSize;
+    if (data!.byteLength > (maxSize * 1024 * 1024)) {
       editor.flashNotification(
-        `Attachment is too large, maximum is ${
-          maximumAttachmentSize / 1024 / 1024
-        }MB`,
+        `Attachment is too large, maximum is ${maxSize}MiB`,
         "error",
       );
       return;

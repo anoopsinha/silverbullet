@@ -1,9 +1,10 @@
-import { isMacLike } from "../../common/util.ts";
 import { FilterList } from "./filter.tsx";
-import { CompletionContext, CompletionResult, featherIcons } from "../deps.ts";
-import { AppCommand } from "../hooks/command.ts";
-import { BuiltinSettings, FilterOption } from "../types.ts";
-import { parseCommand } from "../../common/command.ts";
+import { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
+import { Terminal } from "preact-feather";
+import { AppCommand } from "../../lib/command.ts";
+import { FilterOption } from "$lib/web.ts";
+import { BuiltinSettings } from "../../type/web.ts";
+import { parseCommand } from "$common/command.ts";
 
 export function CommandPalette({
   commands,
@@ -59,7 +60,7 @@ export function CommandPalette({
       placeholder="Command"
       options={options}
       allowNew={false}
-      icon={featherIcons.Terminal}
+      icon={Terminal}
       completer={completer}
       vimMode={vimMode}
       darkMode={darkMode}
@@ -73,4 +74,12 @@ export function CommandPalette({
       }}
     />
   );
+}
+
+/**
+ * Checks if the current platform is Mac-like (Mac, iPhone, iPod, iPad).
+ * @returns A boolean indicating if the platform is Mac-like.
+ */
+function isMacLike() {
+  return /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform);
 }

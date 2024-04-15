@@ -1,5 +1,5 @@
 # Introduction
-SilverBullet is a note-taking application optimized for people with a [hacker mindset](https://en.wikipedia.org/wiki/Hacker). We all take notes. There’s a million note taking applications out there. [Literally](https://www.noteapps.ca/). Wouldn’t it be nice to have one where your notes are _more_ than plain text files? Where your notes essentially become a _database_ that you can query; that you can build knowledge custom applications on top of?
+SilverBullet is a note-taking application optimized for people with a [hacker mindset](https://en.wikipedia.org/wiki/Hacker). We all take notes. There’s a million note taking applications out there. [Literally](https://www.noteapps.ca/). Wouldn’t it be nice to have one where your notes are _more_ than plain text files? Where your notes essentially become a _database_ that you can query; that you can build custom knowledge applications on top of? A _hackable notebook_, if you will?
 
 This is what SilverBullet aims to be.
 
@@ -29,11 +29,13 @@ SilverBullet is open source **personal knowledge management system** implemented
 * SilverBullet can be extended using [[Libraries]] and [[Plugs]].
 * SilverBullet is free, [**open source**, MIT licensed](https://github.com/silverbulletmd/silverbullet) software.
 
-To get a feel of what SilverBullet is capable of, have a look at this (always ever so slightly out of date) introduction video.
+To get a feel of what SilverBullet is capable of, have a look at this introduction video:
 
 ```embed
-url: https://youtu.be/BbNbZgOwB-Y
+url: https://youtu.be/8btx9HeuZ4s
 ```
+If you want to dig deeper, there’s another video on [the template system](https://www.youtube.com/watch?v=ZiM1RM0DCgo).
+
 
 # Try it
 Here’s the kicker:

@@ -1,5 +1,4 @@
-import { LintEvent } from "$sb/app_event.ts";
-import { LintDiagnostic } from "$sb/types.ts";
+import type { LintDiagnostic, LintEvent } from "../../plug-api/types.ts";
 import {
   findNodeOfType,
   renderToText,

@@ -1,24 +1,19 @@
-import { safeRun } from "../common/util.ts";
 import { Confirm, Prompt } from "./components/basic_modals.tsx";
 import { CommandPalette } from "./components/command_palette.tsx";
 import { FilterList } from "./components/filter.tsx";
 import { PageNavigator } from "./components/page_navigator.tsx";
 import { TopBar } from "./components/top_bar.tsx";
 import reducer from "./reducer.ts";
-import { Action, AppViewState, initialViewState } from "./types.ts";
-import {
-  closeSearchPanel,
-  featherIcons,
-  preactRender,
-  runScopeHandlers,
-  useEffect,
-  useReducer,
-} from "./deps.ts";
+import { Action, AppViewState, initialViewState } from "../type/web.ts";
+import * as featherIcons from "preact-feather";
+import { h, render as preactRender } from "preact";
+import { useEffect, useReducer } from "preact/hooks";
+import { closeSearchPanel } from "@codemirror/search";
+import { runScopeHandlers } from "@codemirror/view";
 import type { Client } from "./client.ts";
 import { Panel } from "./components/panel.tsx";
-import { h } from "./deps.ts";
-import { sleep } from "$sb/lib/async.ts";
-import { parseCommand } from "../common/command.ts";
+import { safeRun, sleep } from "../lib/async.ts";
+import { parseCommand } from "$common/command.ts";
 
 export class MainUI {
   viewState: AppViewState = initialViewState;
@@ -192,6 +187,7 @@ export class MainUI {
           syncFailures={viewState.syncFailures}
           unsavedChanges={viewState.unsavedChanges}
           isLoading={viewState.isLoading}
+          isMobile={viewState.isMobile}
           vimMode={viewState.uiOptions.vimMode}
           darkMode={viewState.uiOptions.darkMode}
           progressPerc={viewState.progressPerc}
@@ -209,7 +205,7 @@ export class MainUI {
               return;
             }
             console.log("Now renaming page to...", newName);
-            await client.system.system.invokeFunction(
+            await client.clientSystem.system.invokeFunction(
               "index.renamePageCommand",
               [{ page: newName }],
             );
@@ -248,25 +244,30 @@ export class MainUI {
                 },
               }]
               : [],
-            ...viewState.settings.actionButtons.map((button) => {
-              const parsedCommand = parseCommand(button.command);
-              let featherIcon =
-                (featherIcons as any)[kebabToCamel(button.icon)];
-              if (!featherIcon) {
-                featherIcon = featherIcons.HelpCircle;
-              }
-              return {
-                icon: featherIcon,
-                description: button.description || "",
-                callback: () => {
-                  client.runCommandByName(
-                    parsedCommand.name,
-                    parsedCommand.args,
-                  );
-                },
-                href: "",
-              };
-            }),
+            ...viewState.settings.actionButtons
+              .filter((button) =>
+                (typeof button.mobile === "undefined") ||
+                (button.mobile === viewState.isMobile)
+              )
+              .map((button) => {
+                const parsedCommand = parseCommand(button.command);
+                let featherIcon =
+                  (featherIcons as any)[kebabToCamel(button.icon)];
+                if (!featherIcon) {
+                  featherIcon = featherIcons.HelpCircle;
+                }
+                return {
+                  icon: featherIcon,
+                  description: button.description || "",
+                  callback: () => {
+                    client.runCommandByName(
+                      parsedCommand.name,
+                      parsedCommand.args,
+                    );
+                  },
+                  href: "",
+                };
+              }),
           ]}
           rhs={!!viewState.panels.rhs.mode && (
             <div

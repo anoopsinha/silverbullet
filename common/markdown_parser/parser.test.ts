@@ -3,8 +3,8 @@ import {
   collectNodesOfType,
   findNodeOfType,
   renderToText,
-} from "../../plug-api/lib/tree.ts";
-import { assertEquals, assertNotEquals } from "../../test_deps.ts";
+} from "$sb/lib/tree.ts";
+import { assertEquals, assertNotEquals } from "$std/testing/asserts.ts";
 import { extendedMarkdownLanguage } from "./parser.ts";
 
 const sample1 = `---
